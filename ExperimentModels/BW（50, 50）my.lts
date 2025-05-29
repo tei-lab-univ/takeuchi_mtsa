@@ -1,0 +1,101 @@
+/******************************************************************************
+
+An engineering company evaluates projects in order to decide which ones to
+bid for. For this a document describing the project needs to be accepted by
+the company's engineering teams. If all the teams accept it, the document is
+approved. It is discarded if all teams reject it.
+
+There is a need for a workflow that can cope with the requests. We synthesize
+a controller that acts as an enforcer for an emerging workflow that guarantees:
+  a- A document can be reassigned to a team that has rejected it.
+  b- A document cannot be reassigned to a team that has already accepted it.
+  c- Only when a team rejects it after (all possible) re-evaluation can the
+     document be rejected without consensus.
+
+The case study can be scale in two directions:
+1- Teams: The number of engineering teams.
+2- Steps: The (maximum) number of evaluation steps a team can perform.
+
+******************************************************************************/
+
+const N = 50
+const K = 50
+
+const Teams  = N
+const Steps  = K
+
+range Team   = 0..(Teams-1)
+range Step   = 1..Steps
+
+/*****************************************************************************/
+
+Team(ID=0) = Arrival,
+  Arrival = (
+  　arriveDocument -> Pending[1] ),
+  Pending[s:Step] = (
+    assign[ID] -> Assigned[s] ),
+  Assigned[s:Step] = (
+    when(s <  Steps) reject[ID][s] -> Pending[s+1] |
+	when(s == Steps) reject[ID][s] -> Judge |
+    accept[ID] -> Judge ),
+  Judge = (
+	refuse  -> Arrival |
+    approve -> Arrival ).
+
+/*
+Crew(Tid=0) = Pending,
+  Pending = (
+    assign[Tid] -> Assigned[1]),
+  Assigned[s:Step] = (
+    reject[Tid][s] -> Rejected[s] |
+    accept[Tid]    -> Accepted    ),
+  Rejected[s:Step] = (
+    refuse  -> Pending |
+    approve -> ERROR |
+    assign[Tid] -> if (s < Steps) then Assigned[s+1] else ERROR ),
+  Accepted = (
+    {approve,refuse} -> Pending |
+    assign[Tid] -> ERROR ).
+
+
+Document = Count[0],
+  Count[c:0..Teams-1] = (
+    reject[Team][Steps] -> Rejected |
+    accept[Team] -> Count[c+1] |
+    approve -> ERROR |
+    refuse -> if (c==0) then Document else ERROR ),
+  Count[Teams] = (
+    {accept[Team],reject[Team][Steps]} -> Count[Teams] |
+    approve -> Document |
+    refuse  -> ERROR ),
+  Rejected = (
+    {accept[Team],reject[Team][Steps]} -> Rejected |
+    approve -> ERROR |
+    refuse  -> Document ).
+*/
+
+
+
+/*****************************************************************************/
+
+fluent REFUSE_PROCESS = <reject[Team][Steps],arriveDocument>
+ltl_property CONDITION_REFUSE  = [](REFUSE_PROCESS -> !approve)
+ltl_property CONDITION_APPROVE = [](!REFUSE_PROCESS -> !refuse)
+
+||Plant = (forall [id:Team] Team(id)).
+
+controllerSpec Goal = {
+	safety = 	{
+				CONDITION_REFUSE,
+				CONDITION_APPROVE,
+				}
+	controllable = {assign[Team], refuse, approve}
+	comparison = {assign[49], assign[48], assign[48], assign[47], assign[47], assign[46], assign[46], assign[45], assign[45], assign[44], assign[44], assign[43], assign[43], assign[42], assign[42], assign[41], assign[41], assign[40], assign[40], assign[39], assign[39], assign[38], assign[38], assign[37], assign[37], assign[36], assign[36], assign[35], assign[35], assign[34], assign[34], assign[33], assign[33], assign[32], assign[32], assign[31], assign[31], assign[30], assign[30], assign[29], assign[29], assign[28], assign[28], assign[27], assign[27], assign[26], assign[26], assign[25], assign[25], assign[24], assign[24], assign[23], assign[23], assign[22], assign[22], assign[21], assign[21], assign[20], assign[20], assign[19], assign[19], assign[18], assign[18], assign[17], assign[17], assign[16], assign[16], assign[15], assign[15], assign[14], assign[14], assign[13], assign[13], assign[12], assign[12], assign[11], assign[11], assign[10], assign[10], assign[9], assign[9], assign[8], assign[8], assign[7], assign[7], assign[6], assign[6], assign[5], assign[5], assign[4], assign[4], assign[3], assign[3], assign[2], assign[2], assign[1], assign[1], assign[0]}
+	marking = {refuse, approve}
+	nonblocking
+}
+
+controller ||TraditionalController = (Plant)~{Goal}.
+controller ||MonolithicController  = (forall [id:Team] Team(id))~{Goal}.
+heuristic  ||DirectedController    = (forall [id:Team] Team(id))~{Goal}.
+
